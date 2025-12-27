@@ -141,25 +141,50 @@ jobs:
     steps:
       - run: { command: echo "All required jobs finished successfully" }
 
+  build-idea-plugin:
+    docker: [{ image: 'cimg/openjdk:17.0.1-node' }]
+    resource_class: large
+    environment:
+      GRADLE_OPTS: -Dorg.gradle.workers.max=2 -Dorg.gradle.jvmargs='-Xmx2147483648 --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED'
+    steps:
+      - checkout
+      - restore_cache:
+          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - restore_cache:
+          key: gradle-cache-{{ checksum "versions.props" }}-{{ checksum "build.gradle" }}
+      - run:
+          name: Build IDEA Plugin
+          command: ./gradlew :idea-plugin:buildPlugin -x test -x check --stacktrace
+      - save_cache:
+          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths: [ ~/.gradle/wrapper ]
+      - save_cache:
+          key: gradle-cache-{{ checksum "versions.props" }}-{{ checksum "build.gradle" }}
+          paths: [ ~/.gradle/caches ]
+      - store_artifacts:
+          path: idea-plugin/build/distributions
+          destination: idea-plugin
+
 workflows:
   version: 2
   build:
     jobs:
-      - check-build-linux-amd64:
-          filters: { tags: { only: /.*/ } }
-
-      - build-linux-arm64:
-          requires: [ check-build-linux-amd64 ]
-          filters: { tags: { only: /.*/ } }
-
-      - build-macos:
-          requires: [ check-build-linux-amd64 ]
-          filters: { tags: { only: /.*/ } }
-
-      - circle-all:
-          requires: [ check-build-linux-amd64, build-linux-arm64, build-macos ]
-          filters: { tags: { only: /.*/ } }
-
-      - publish:
-          requires: [ circle-all ]
-          filters: { tags: { only: /.*/ }, branches: { only: develop } }
+      - build-idea-plugin
+#      - check-build-linux-amd64:
+#          filters: { tags: { only: /.*/ } }
+#
+#      - build-linux-arm64:
+#          requires: [ check-build-linux-amd64 ]
+#          filters: { tags: { only: /.*/ } }
+#
+#      - build-macos:
+#          requires: [ check-build-linux-amd64 ]
+#          filters: { tags: { only: /.*/ } }
+#
+#      - circle-all:
+#          requires: [ check-build-linux-amd64, build-linux-arm64, build-macos ]
+#          filters: { tags: { only: /.*/ } }
+#
+#      - publish:
+#          requires: [ circle-all ]
+#          filters: { tags: { only: /.*/ }, branches: { only: develop } }

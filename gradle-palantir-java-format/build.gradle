@@ -23,14 +23,16 @@ dependencies {
     implementation 'com.palantir.gradle.idea-configuration:gradle-idea-configuration'
 
     testImplementation project(':palantir-java-format')
-    testImplementation 'com.netflix.nebula:nebula-test'
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.assertj:assertj-core'
+    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
 
     testRuntimeOnly 'org.junit.vintage:junit-vintage-engine'
 
     pluginClasspath 'com.diffplug.spotless:spotless-plugin-gradle'
 
+    gradlePluginForTesting 'com.palantir.gradle.consistentversions:gradle-consistent-versions'
+    gradlePluginForTesting 'com.diffplug.spotless:spotless-plugin-gradle'
     gradlePluginForTesting 'com.palantir.gradle.jdks:gradle-jdks-settings'
     gradlePluginForTesting 'com.palantir.baseline:gradle-baseline-java'
     gradlePluginForTesting 'com.palantir.gradle.jdkslatest:gradle-jdks-latest'
@@ -120,6 +122,5 @@ tasks.named("test").configure {
 }
 
 gradleTestUtils {
-    gradleVersions = ['8.14.3']
     configurationCacheEnabled = true
 }

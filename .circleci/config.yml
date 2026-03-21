@@ -141,6 +141,43 @@ jobs:
     steps:
       - run: { command: echo "All required jobs finished successfully" }
 
+  build-cli:
+    docker: [{ image: 'cimg/openjdk:17.0.1-node' }]
+    resource_class: large
+    environment:
+      GRADLE_OPTS: -Dorg.gradle.workers.max=2 -Dorg.gradle.jvmargs='-Xmx2147483648 --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED'
+    steps:
+      - checkout
+      - restore_cache:
+          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - restore_cache:
+          key: gradle-cache-{{ checksum "versions.props" }}-{{ checksum "build.gradle" }}
+      - run:
+          name: Build CLI distribution
+          command: ./gradlew :palantir-java-format:distZip -x test -x check --stacktrace
+      - run:
+          name: Inject JVM module exports into start script
+          command: |
+            cd palantir-java-format/build/distributions
+            ZIPFILE=$(ls palantir-java-format-*.zip)
+            unzip -q "$ZIPFILE" -d tmp
+            DIST_DIR=$(ls tmp)
+            # Patch the start script to include required --add-exports
+            sed -i 's|^DEFAULT_JVM_OPTS=""$|DEFAULT_JVM_OPTS="'"'"'--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED'"'"' '"'"'--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED'"'"'"|' "tmp/$DIST_DIR/bin/palantir-java-format"
+            # Repackage
+            rm "$ZIPFILE"
+            cd tmp && zip -qr "../$ZIPFILE" "$DIST_DIR" && cd ..
+            rm -rf tmp
+      - save_cache:
+          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths: [ ~/.gradle/wrapper ]
+      - save_cache:
+          key: gradle-cache-{{ checksum "versions.props" }}-{{ checksum "build.gradle" }}
+          paths: [ ~/.gradle/caches ]
+      - store_artifacts:
+          path: palantir-java-format/build/distributions
+          destination: cli
+
   build-idea-plugin:
     docker: [{ image: 'cimg/openjdk:17.0.1-node' }]
     resource_class: large
@@ -169,6 +206,7 @@ workflows:
   version: 2
   build:
     jobs:
+      - build-cli
       - build-idea-plugin
 #      - check-build-linux-amd64:
 #          filters: { tags: { only: /.*/ } }
